@@ -157,10 +157,10 @@ collectSquaresOnHorizontal :: Board -> Move -> [Square]
 collectSquaresOnHorizontal board (ff,fr,lf,lr) = [square | square <- board, onCross (ff,fr,(file square),(rank square)), onCross (lf,lr,(file square),(rank square)), ((inRange (ord ff) (ord (file square)) (ord lf)) || (inRange fr (rank square) lr))]
 
 diagPathFree :: Board -> Move -> Bool
-diagPathFree board (ff,fr,lf,lr) = [occSquares | occSquares <- (collectSquaresOnDiagonal board (ff,fr,lf,lr)), ((teamOf $ piece occSquares) /= Blank)] == []
+diagPathFree board move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnDiagonal board move)]
 
 crossPathFree :: Board -> Move -> Bool
-crossPathFree board (ff,fr,lf,lr) = [occSquares | occSquares <- (collectSquaresOnHorizontal board (ff,fr,lf,lr)), ((teamOf $ piece occSquares) /= Blank)] == []
+crossPathFree board move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnHorizontal board move)]
 
 getTeamAtSquare :: Board -> Char -> Int -> Team
 getTeamAtSquare board f r = teamOf $ getPieceAtSquare board f r
