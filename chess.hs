@@ -15,14 +15,19 @@ data Piece = Piece {
   teamOf :: Team
 } deriving (Show, Eq)
 
+type File = Char
+type Rank = Integer
+
+data Square = Square {
+  file :: File,
+  rank :: Rank,
+  piece :: Maybe Piece
+} deriving (Show, Eq)
+
+type Board = [Square]
+genBoard :: Board
+genBoard = [Square file rank Nothing | file <- ['a'..'h'], rank <- [1..8]]
+
 main :: IO ()
 main = do
-  let moveNumber = 0
-  let piece = Piece Pawn Black
-  moveNumber <- return (moveNumber+1)
-  print(piece)
-  print(typeOf piece)
-  a <- getLine
-  print(a)
-  print(moveNumber)
-
+  print(genBoard)
