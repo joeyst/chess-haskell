@@ -118,6 +118,9 @@ findHorizontalChange inp = ((ord $ inp!!2) - (ord $ inp!!0))
 findVerticalChange :: String -> Int
 findVerticalChange inp = ((digitToInt $ inp!!3) - (digitToInt $ inp!!1))
 
+isCorrectTeam :: Board -> Int -> File -> Rank -> Bool
+isCorrectTeam board turn f r = (not (teamOf (getPieceAtSquare board f r) == Blank) && ((teamOf $ getPieceAtSquare board f r) == Black) == (even turn))
+
 main :: IO ()
 main = do
   let board = genBoard
@@ -132,4 +135,5 @@ main = do
   print(isMoving inp)
   print(findHorizontalChange inp)
   print(findVerticalChange inp)
+  print(isCorrectTeam updatedBoard 2 'e' 4)
   
