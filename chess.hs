@@ -123,8 +123,11 @@ findHorizontalChange (ff,fr,lf,lr) = ((ord lf) - (ord ff))
 findVerticalChange :: Move -> Int
 findVerticalChange (ff,fr,lf,lr) = (lr - fr)
 
-isCorrectTeam :: Board -> Int -> File -> Rank -> Bool
-isCorrectTeam board turn f r = (not (teamOf (getPieceAtSquare board f r) == Blank) && ((teamOf $ getPieceAtSquare board f r) == Black) == (even turn))
+getTeamOf :: Board -> (File, Rank) -> Team
+getTeamOf board (f, r) = teamOf $ getPieceAtSquare board f r
+
+isCorrectTeam :: Board -> Int -> (File, Rank) -> Bool
+isCorrectTeam board turn (f, r) = ((getTeamOf board (f, r)) /= Blank) && ((getTeamOf board (f, r) == Black) || odd turn)
 
 getPieceTypeAtSquare :: Board -> File -> Rank -> PieceType
 getPieceTypeAtSquare board f r = typeOfPiece $ getPieceAtSquare board f r
@@ -228,7 +231,7 @@ getValidMove board turn = do
     let parsedCandidate = parseToMove candidate
     ; let (ff, fr, lf, lr) = parseToMove candidate
     ; if ((not $ squareExists board ff fr) || (not $ squareExists board lf lr)) then getValidMove board turn else do {
-      if (not $ isCorrectTeam board turn ff fr) then getValidMove board turn else
+      if (not $ isCorrectTeam board turn (ff,fr)) then getValidMove board turn else
         if (not $ capturable board (getPieceTypeAtSquare board ff fr) parsedCandidate) then getValidMove board turn else
           return parsedCandidate
   }
