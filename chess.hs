@@ -226,8 +226,6 @@ getValidMove board turn = do
     then (getValidMove board turn)
   else do {
     let parsedCandidate = parseToMove candidate
-    ; print (findHorizontalChange parsedCandidate)
-    ; print (findVerticalChange parsedCandidate)
     ; let (ff, fr, lf, lr) = parseToMove candidate
     ; if ((not $ squareExists board ff fr) || (not $ squareExists board lf lr)) then getValidMove board turn else do {
       if (not $ isCorrectTeam board turn ff fr) then getValidMove board turn else
