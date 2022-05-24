@@ -174,21 +174,78 @@ diagPathCapturable board (ff,fr,lf,lr) = ((diagPathFree board (ff,fr,lf,lr)) && 
 lPathCapturable :: Board -> Move -> Bool
 lPathCapturable board (ff,fr,lf,lr) = (getTeamAtSquare board ff fr) /= (getTeamAtSquare board lf lr)
 
+adjustPawnOnTeam :: Team -> Int
+adjustPawnOnTeam team = if team == White then 2 else 7
+
 capturable :: Board -> PieceType -> Move -> Bool
 capturable board Rook move = crossPathCapturable board move && onCross move
 capturable board Bishop move = diagPathCapturable board move && onDiagonal move
 capturable board Knight move = lPathCapturable board move && onL move
 capturable board Queen move = ((onDiagonal move && diagPathCapturable board move) || (onCross move && crossPathCapturable board move))
+capturable board Pawn (ff,fr,lf,lr) 
+  | getTeamAtSquare board ff fr == Blank = False
+  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 1) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnBool (getTeamAtSquare board ff fr == White))) && (getTeamAtSquare board lf lr /= getTeamAtSquare board ff fr) && (getTeamAtSquare board lf lr /= Blank) = True
+  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnBool (getTeamAtSquare board ff fr == White))) && (getTeamAtSquare board lf lr == Blank) = True
+  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (2 * (adjustOnBool (getTeamAtSquare board ff fr == White)))) && (getTeamAtSquare board lf (fr + (adjustOnBool (getTeamAtSquare board ff fr == White))) == Blank) && (getTeamAtSquare board lf lr == Blank) && (adjustPawnOnTeam $ getTeamAtSquare board ff fr) == fr = True
+  | otherwise = False
+capturable board King (ff,fr,lf,lr)
+  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) <= 1) && ((abs $ findVerticalChange (ff,fr,lf,lr)) <= 1) && ((getTeamAtSquare board lf lr) /= (getTeamAtSquare board ff fr)) = True
+  | otherwise = False
+capturable board Empty move = False
 
+addRankOfPieces :: Rank -> PieceType -> Team -> Board
+addRankOfPieces rank pieceType team = [(Square file rank (Piece pieceType team)) | file <- ['a'..'h']]
+
+setUpRank :: Board -> Rank -> PieceType -> Team -> Board
+setUpRank board rank pieceType team = ((addRankOfPieces rank pieceType team) ++ (filterBoardByRank board rank))
+
+addRankOfCustomPieces :: Rank -> [Piece] -> [File] -> Board
+addRankOfCustomPieces rank [] [] = []
+addRankOfCustomPieces rank (pc:pcs) (f:fs) = (Square f rank pc) : (addRankOfCustomPieces rank pcs fs)
+
+setUpCustomRank :: Board -> Rank -> [Piece] -> [File] -> Board
+setUpCustomRank board rank pieces files = ((addRankOfCustomPieces rank pieces files) ++ (filterBoardByRank board rank))
+
+setupBoard :: Board
+setupBoard = do {
+  let board = genBoard
+  ; let boardWithWhitePawns = (setUpRank board 2 Pawn White)
+  ; let boardWithBlackPawns = (setUpRank boardWithWhitePawns 7 Pawn Black)
+  ; let boardWithBlackPieces = (setUpCustomRank boardWithBlackPawns 8 [(Piece Rook Black), (Piece Knight Black), (Piece Bishop Black), (Piece Queen Black), (Piece King Black), (Piece Bishop Black), (Piece Knight Black), (Piece Rook Black)] ['a'..'h'])
+  ; boardWithWhitePieces <- (setUpCustomRank boardWithBlackPieces 1 [(Piece Rook White), (Piece Knight White), (Piece Bishop White), (Piece Queen White), (Piece King White), (Piece Bishop White), (Piece Knight White), (Piece Rook White)] ['a'..'h'])
+  ; return boardWithWhitePieces
+} 
+
+type Turn = Int
+getValidMove :: Board -> Turn -> IO Move
+-- not implemented: castling, check, en passent
+getValidMove board turn = do
+  print ("Enter move: ")
+  candidate <- getLine
+  if not $ isParsable candidate 
+    then (getValidMove board turn)
+  else do {
+    let parsedCandidate = parseToMove candidate
+    ; print (findHorizontalChange parsedCandidate)
+    ; print (findVerticalChange parsedCandidate)
+    ; let (ff, fr, lf, lr) = parseToMove candidate
+    ; if ((not $ squareExists board ff fr) || (not $ squareExists board lf lr)) then getValidMove board turn else do {
+      if (not $ isCorrectTeam board turn ff fr) then getValidMove board turn else
+        if (not $ capturable board (getPieceTypeAtSquare board ff fr) parsedCandidate) then getValidMove board turn else
+          return parsedCandidate
+  }
+}
+
+playMove :: Board -> Turn -> IO ()
+playMove board turn = do {
+  printBoard board
+  ; (ff,fr,lf,lr) <- getValidMove board turn
+  ; playMove (updateBoardWithCoords board ff fr lf lr) (turn + 1)
+}
 
 main :: IO ()
 main = do
-  let board = genBoard
-  let updatedBoard = (assignPieceToSquare board 'd' 4 (Piece Rook Black))
-  printBoard updatedBoard
-  printBoard board
-  inp <- getLine
-  let inpParsed = parseToMove inp
-  let (ff, fr, lf, lr) = inpParsed
-  print (capturable updatedBoard (getPieceTypeAtSquare updatedBoard ff fr) inpParsed)
+  let board = setupBoard
+  let turn = 1
+  playMove board turn
   print("")
