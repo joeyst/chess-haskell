@@ -174,12 +174,21 @@ diagPathCapturable board (ff,fr,lf,lr) = ((diagPathFree board (ff,fr,lf,lr)) && 
 lPathCapturable :: Board -> Move -> Bool
 lPathCapturable board (ff,fr,lf,lr) = (getTeamAtSquare board ff fr) /= (getTeamAtSquare board lf lr)
 
+capturable :: Board -> PieceType -> Move -> Bool
+capturable board Rook move = crossPathCapturable board move && onCross move
+capturable board Bishop move = diagPathCapturable board move && onDiagonal move
+capturable board Knight move = lPathCapturable board move && onL move
+capturable board Queen move = ((onDiagonal move && diagPathCapturable board move) || (onCross move && crossPathCapturable board move))
+
+
 main :: IO ()
 main = do
   let board = genBoard
-  let updatedBoard = (assignPieceToSquare board 'd' 4 (Piece Pawn Black))
+  let updatedBoard = (assignPieceToSquare board 'd' 4 (Piece Rook Black))
   printBoard updatedBoard
   printBoard board
   inp <- getLine
   let inpParsed = parseToMove inp
   let (ff, fr, lf, lr) = inpParsed
+  print (capturable updatedBoard (getPieceTypeAtSquare updatedBoard ff fr) inpParsed)
+  print("")
