@@ -191,6 +191,12 @@ lPathCapturable board (ff,fr,lf,lr) = (getTeamAtSquare board (ff,fr)) /= (getTea
 adjustPawnOnTeam :: Team -> Int
 adjustPawnOnTeam team = if team == White then 2 else 7
 
+adjustOnTeam :: Board -> (File, Rank) -> Int
+adjustOnTeam board (f, r) = if (getTeamAtSquare board (f,r)) == White then 1 else -1
+
+isOppositeTeam :: Board -> Move -> Bool
+isOppositeTeam board (ff,fr,lf,lr) = (getTeamAtSquare board (lf,lr) /= getTeamAtSquare board (ff,fr)) && (getTeamAtSquare board (lf,lr) /= Blank)
+
 capturable :: Board -> PieceType -> Move -> Bool
 capturable board Rook move = crossPathCapturable board move && onCross move
 capturable board Bishop move = diagPathCapturable board move && onDiagonal move
@@ -198,7 +204,8 @@ capturable board Knight move = lPathCapturable board move && onL move
 capturable board Queen move = ((onDiagonal move && diagPathCapturable board move) || (onCross move && crossPathCapturable board move))
 capturable board Pawn (ff,fr,lf,lr) 
   | getTeamAtSquare board (ff,fr) == Blank = False
-  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 1) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnBool (getTeamAtSquare board (ff,fr) == White))) && (getTeamAtSquare board (lf,lr) /= getTeamAtSquare board (ff,fr)) && (getTeamAtSquare board (lf,lr) /= Blank) = True
+  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 1) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnTeam board (ff, fr))) && (isOppositeTeam board (ff,fr,lf,lr)) = True
+  -- reqs: 1) moving one to side 2) moving one up if White 3) moving one down if Black 4) the other square is occupied by the *opposite* team
   | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnBool (getTeamAtSquare board (ff,fr) == White))) && (getTeamAtSquare board (lf,lr) == Blank) = True
   | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (2 * (adjustOnBool (getTeamAtSquare board (ff,fr) == White)))) && (getTeamAtSquare board (lf, (fr + (adjustOnBool (getTeamAtSquare board (ff,fr) == White)))) == Blank) && (getTeamAtSquare board (lf,lr) == Blank) && (adjustPawnOnTeam $ getTeamAtSquare board (ff,fr)) == fr = True
   | otherwise = False
