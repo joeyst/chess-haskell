@@ -1,4 +1,5 @@
 import Data.Char
+import Data.List
 
 data PieceType = 
   Pawn | 
@@ -51,8 +52,25 @@ type Board = [Square]
 genBoard :: Board
 genBoard = [Square file rank (Piece Empty Blank) | file <- ['a'..'h'], rank <- [1..8]]
 
+getPieceAtSquare :: Board -> Char -> Integer -> Piece
+getPieceAtSquare board f r = head [piece square | (square) <- board, (file square) == f, (rank square) == r]
+
+getRank :: Board -> Integer -> [Square]
+getRank board n = [square | square <- board, rank square == n]
+
+getFile :: Board -> Char -> [Square]
+getFile board ch = [square | square <- board, file square == ch]
+
+sortRank :: [Square] -> [Square]
+sortRank [] = []
+sortRank (s:ss) = sortRank smaller ++ [s] ++ sortRank larger
+  where
+    smaller = [a | a <- ss, file a < file s]
+    larger = [b | b <- ss, file b > file s]
+
+printRank :: [Square] -> IO ()
+printRank rank = putStrLn $ map getPrintable $ map piece $ sortRank rank
+
 main :: IO ()
 main = do
-  putChar $ getPrintable (Piece Pawn Black)
-  putChar $ getPrintable (Piece Knight White)
-  putChar $ getPrintable (Piece Empty Blank)
+  printRank $ getRank genBoard 4
