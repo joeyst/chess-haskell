@@ -23,7 +23,7 @@ data Piece = Piece {
 } deriving (Show, Eq)
 
 type File = Char
-type Rank = Integer
+type Rank = Int
 
 data Square = Square {
   file :: File,
@@ -54,10 +54,10 @@ type Board = [Square]
 genBoard :: Board
 genBoard = [Square file rank (Piece Empty Blank) | file <- ['a'..'h'], rank <- [1..8]]
 
-getPieceAtSquare :: Board -> Char -> Integer -> Piece
+getPieceAtSquare :: Board -> Char -> Int -> Piece
 getPieceAtSquare board f r = head [piece square | (square) <- board, (file square) == f, (rank square) == r]
 
-getRank :: Board -> Integer -> [Square]
+getRank :: Board -> Int -> [Square]
 getRank board n = [square | square <- board, rank square == n]
 
 getFile :: Board -> Char -> [Square]
@@ -70,13 +70,13 @@ sortRank (s:ss) = sortRank smaller ++ [s] ++ sortRank larger
     smaller = [a | a <- ss, file a < file s]
     larger = [b | b <- ss, file b > file s]
 
-printRank :: Board -> Integer -> IO ()
+printRank :: Board -> Int -> IO ()
 printRank board n = putStrLn $ map getPrintable $ map piece $ sortRank $ getRank board n
 
-getMaxRank :: Board -> Integer
+getMaxRank :: Board -> Int
 getMaxRank board = maximum [rank square | square <- board]
 
-filterBoardByRank :: Board -> Integer -> Board
+filterBoardByRank :: Board -> Int -> Board
 filterBoardByRank board n = [square | square <- board, rank square /= n]
 
 printBoard :: Board -> IO ()
@@ -86,16 +86,16 @@ printBoard board = do {
   ; printBoard $ filterBoardByRank board $ getMaxRank board
 }
 
-filterBoardBySquare :: Board -> Char -> Integer -> Board
+filterBoardBySquare :: Board -> Char -> Int -> Board
 filterBoardBySquare board f r = [square | square <- board, ((file square /= f) || (rank square /= r))]
 
-assignPieceToSquare :: Board -> Char -> Integer -> Piece -> Board
+assignPieceToSquare :: Board -> Char -> Int -> Piece -> Board
 assignPieceToSquare board f r piece = (filterBoardBySquare board f r) ++ [Square f r piece]
 
-removePieceFromSquare :: Board -> Char -> Integer -> Board
+removePieceFromSquare :: Board -> Char -> Int -> Board
 removePieceFromSquare board f r = (filterBoardBySquare board f r) ++ assignPieceToSquare board f r (Piece Empty Blank)
 
-updateBoardWithCoords :: Board -> Char -> Integer -> Char -> Integer -> Board
+updateBoardWithCoords :: Board -> Char -> Int -> Char -> Int -> Board
 updateBoardWithCoords board ff fr lf lr = removePieceFromSquare (assignPieceToSquare board lf lr $ getPieceAtSquare board ff fr) ff fr
 
 isHeadFile :: String -> String
@@ -112,11 +112,16 @@ isParsable inp = (isHeadRank $ isHeadFile $ isHeadRank $ isHeadFile inp) == ""
 isMoving :: String -> Bool
 isMoving inp = (inp!!0 /= inp!!2 || inp!!1 /= inp!!3)
 
-findHorizontalChange :: String -> Int
-findHorizontalChange inp = ((ord $ inp!!2) - (ord $ inp!!0))
+type Move = (File, Rank, File, Rank)
 
-findVerticalChange :: String -> Int
-findVerticalChange inp = ((digitToInt $ inp!!3) - (digitToInt $ inp!!1))
+parseToMove :: String -> Move
+parseToMove str = (str!!0, digitToInt $ str!!1, str!!2, digitToInt $ str!!3)
+
+findHorizontalChange :: Move -> Int
+findHorizontalChange (ff,fr,lf,lr) = ((ord lf) - (ord ff))
+
+findVerticalChange :: Move -> Int
+findVerticalChange (ff,fr,lf,lr) = (lr - fr)
 
 isCorrectTeam :: Board -> Int -> File -> Rank -> Bool
 isCorrectTeam board turn f r = (not (teamOf (getPieceAtSquare board f r) == Blank) && ((teamOf $ getPieceAtSquare board f r) == Black) == (even turn))
@@ -124,20 +129,50 @@ isCorrectTeam board turn f r = (not (teamOf (getPieceAtSquare board f r) == Blan
 getPieceTypeAtSquare :: Board -> File -> Rank -> PieceType
 getPieceTypeAtSquare board f r = typeOfPiece $ getPieceAtSquare board f r
 
-filterBoardByRankAndFile :: Board -> Char -> Integer -> [Square]
+filterBoardByRankAndFile :: Board -> Char -> Int -> [Square]
 filterBoardByRankAndFile board f r = [square | square <- board, (file square == f), (rank square == r)]
 
-squareExists :: Board -> Char -> Integer -> Bool
+squareExists :: Board -> Char -> Int -> Bool
 squareExists board f r = (filterBoardByRankAndFile board f r) /= []
 
-onCross :: String -> Bool
+onCross :: Move -> Bool
 onCross str = ((findHorizontalChange str == 0) /= (findVerticalChange str == 0))
 
-onDiagonal :: String -> Bool
+onDiagonal :: Move -> Bool
 onDiagonal str = (((abs $ findHorizontalChange str) == (abs $ findVerticalChange str)) && findHorizontalChange str /= 0)
 
-onL :: String -> Bool
+onL :: Move -> Bool
 onL str = ((((abs $ findHorizontalChange str) == 1) && ((abs $ findVerticalChange str) == 2)) || (((abs $ findHorizontalChange str) == 2) && ((abs $ findVerticalChange str) == 1)))
+
+adjustOnBool :: Bool -> Int
+adjustOnBool direction = if direction then 1 else -1
+
+inRange :: Int -> Int -> Int -> Bool
+inRange outerOne candidate outerTwo = (((outerOne < candidate) && (candidate < outerTwo)) || ((outerOne > candidate) && (candidate > outerTwo)))
+
+collectSquaresOnDiagonal :: Board -> Move -> [Square]
+collectSquaresOnDiagonal board (ff,fr,lf,lr) = [square | square <- board, onDiagonal (ff,fr,(file square),(rank square)), onDiagonal (lf,lr,(file square),(rank square)), (inRange (ord ff) (ord (file square)) (ord lf)), (inRange fr (rank square) lr)]
+
+collectSquaresOnHorizontal :: Board -> Move -> [Square]
+collectSquaresOnHorizontal board (ff,fr,lf,lr) = [square | square <- board, onCross (ff,fr,(file square),(rank square)), onCross (lf,lr,(file square),(rank square)), ((inRange (ord ff) (ord (file square)) (ord lf)) || (inRange fr (rank square) lr))]
+
+diagPathFree :: Board -> Move -> Bool
+diagPathFree board (ff,fr,lf,lr) = [occSquares | occSquares <- (collectSquaresOnDiagonal board (ff,fr,lf,lr)), ((teamOf $ piece occSquares) /= Blank)] == []
+
+crossPathFree :: Board -> Move -> Bool
+crossPathFree board (ff,fr,lf,lr) = [occSquares | occSquares <- (collectSquaresOnHorizontal board (ff,fr,lf,lr)), ((teamOf $ piece occSquares) /= Blank)] == []
+
+getTeamAtSquare :: Board -> Char -> Int -> Team
+getTeamAtSquare board f r = teamOf $ getPieceAtSquare board f r
+
+crossPathCapturable :: Board -> Move -> Bool
+crossPathCapturable board (ff,fr,lf,lr) = ((crossPathFree board (ff,fr,lf,lr)) && ((getTeamAtSquare board ff fr) /= (getTeamAtSquare board lf lr)))
+
+diagPathCapturable :: Board -> Move -> Bool
+diagPathCapturable board (ff,fr,lf,lr) = ((diagPathFree board (ff,fr,lf,lr)) && ((getTeamAtSquare board ff fr) /= (getTeamAtSquare board lf lr)))
+
+lPathCapturable :: Board -> Move -> Bool
+lPathCapturable board (ff,fr,lf,lr) = (getTeamAtSquare board ff fr) /= (getTeamAtSquare board lf lr)
 
 main :: IO ()
 main = do
@@ -146,10 +181,5 @@ main = do
   printBoard updatedBoard
   printBoard board
   inp <- getLine
-  print(typeOf inp)
-  print("onCross: ")
-  print(onCross inp)
-  print("onDiagonal: ")
-  print(onDiagonal inp)
-  print("onL: ")
-  print(onL inp)
+  let inpParsed = parseToMove inp
+  let (ff, fr, lf, lr) = inpParsed
