@@ -1,5 +1,7 @@
 import Data.Char
 import Data.List
+import Data.Bool
+import Data.Typeable
 
 data PieceType = 
   Pawn | 
@@ -16,7 +18,7 @@ data Team =
   Blank deriving (Show, Eq)
 
 data Piece = Piece {
-  typeOf :: PieceType,
+  typeOfPiece :: PieceType,
   teamOf :: Team
 } deriving (Show, Eq)
 
@@ -31,13 +33,13 @@ data Square = Square {
 
 getLetter :: Piece -> Char
 getLetter piece
-  | typeOf piece == Pawn = 'p'
-  | typeOf piece == Rook = 'r'
-  | typeOf piece == Knight = 'n'
-  | typeOf piece == Bishop = 'b'
-  | typeOf piece == Queen = 'q'
-  | typeOf piece == King = 'k'
-  | typeOf piece == Empty = ' '
+  | typeOfPiece piece == Pawn = 'p'
+  | typeOfPiece piece == Rook = 'r'
+  | typeOfPiece piece == Knight = 'n'
+  | typeOfPiece piece == Bishop = 'b'
+  | typeOfPiece piece == Queen = 'q'
+  | typeOfPiece piece == King = 'k'
+  | typeOfPiece piece == Empty = ' '
 
 convertCase :: Piece -> Char -> Char
 convertCase piece ch
@@ -68,9 +70,66 @@ sortRank (s:ss) = sortRank smaller ++ [s] ++ sortRank larger
     smaller = [a | a <- ss, file a < file s]
     larger = [b | b <- ss, file b > file s]
 
-printRank :: [Square] -> IO ()
-printRank rank = putStrLn $ map getPrintable $ map piece $ sortRank rank
+printRank :: Board -> Integer -> IO ()
+printRank board n = putStrLn $ map getPrintable $ map piece $ sortRank $ getRank board n
+
+getMaxRank :: Board -> Integer
+getMaxRank board = maximum [rank square | square <- board]
+
+filterBoardByRank :: Board -> Integer -> Board
+filterBoardByRank board n = [square | square <- board, rank square /= n]
+
+printBoard :: Board -> IO ()
+printBoard [] = putStrLn("")
+printBoard board = do {
+  printRank board $ getMaxRank board
+  ; printBoard $ filterBoardByRank board $ getMaxRank board
+}
+
+filterBoardBySquare :: Board -> Char -> Integer -> Board
+filterBoardBySquare board f r = [square | square <- board, ((file square /= f) || (rank square /= r))]
+
+assignPieceToSquare :: Board -> Char -> Integer -> Piece -> Board
+assignPieceToSquare board f r piece = (filterBoardBySquare board f r) ++ [Square f r piece]
+
+removePieceFromSquare :: Board -> Char -> Integer -> Board
+removePieceFromSquare board f r = (filterBoardBySquare board f r) ++ assignPieceToSquare board f r (Piece Empty Blank)
+
+updateBoardWithCoords :: Board -> Char -> Integer -> Char -> Integer -> Board
+updateBoardWithCoords board ff fr lf lr = removePieceFromSquare (assignPieceToSquare board lf lr $ getPieceAtSquare board ff fr) ff fr
+
+isHeadFile :: String -> String
+isHeadFile [] = "invalid"
+isHeadFile (x:xs) = if (elem x ['a'..'h']) then xs else "invalid"
+
+isHeadRank :: String -> String
+isHeadRank [] = "invalid"
+isHeadRank (x:xs) = if (elem x ['1'..'8']) then xs else "invalid"
+
+isParsable :: String -> Bool
+isParsable inp = (isHeadRank $ isHeadFile $ isHeadRank $ isHeadFile inp) == ""
+
+isMoving :: String -> Bool
+isMoving inp = (inp!!0 /= inp!!2 || inp!!1 /= inp!!3)
+
+findHorizontalChange :: String -> Int
+findHorizontalChange inp = ((ord $ inp!!2) - (ord $ inp!!0))
+
+findVerticalChange :: String -> Int
+findVerticalChange inp = ((digitToInt $ inp!!3) - (digitToInt $ inp!!1))
 
 main :: IO ()
 main = do
-  printRank $ getRank genBoard 4
+  let board = genBoard
+  let updatedBoard = (assignPieceToSquare board 'd' 4 (Piece Pawn Black))
+  printBoard updatedBoard
+  printBoard board
+  inp <- getLine
+  print(typeOf inp)
+  print(isHeadRank inp)
+  print(isHeadFile inp)
+  print(isParsable inp)
+  print(isMoving inp)
+  print(findHorizontalChange inp)
+  print(findVerticalChange inp)
+  
