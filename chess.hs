@@ -124,6 +124,21 @@ isCorrectTeam board turn f r = (not (teamOf (getPieceAtSquare board f r) == Blan
 getPieceTypeAtSquare :: Board -> File -> Rank -> PieceType
 getPieceTypeAtSquare board f r = typeOfPiece $ getPieceAtSquare board f r
 
+filterBoardByRankAndFile :: Board -> Char -> Integer -> [Square]
+filterBoardByRankAndFile board f r = [square | square <- board, (file square == f), (rank square == r)]
+
+squareExists :: Board -> Char -> Integer -> Bool
+squareExists board f r = (filterBoardByRankAndFile board f r) /= []
+
+onCross :: String -> Bool
+onCross str = ((findHorizontalChange str == 0) /= (findVerticalChange str == 0))
+
+onDiagonal :: String -> Bool
+onDiagonal str = (((abs $ findHorizontalChange str) == (abs $ findVerticalChange str)) && findHorizontalChange str /= 0)
+
+onL :: String -> Bool
+onL str = ((((abs $ findHorizontalChange str) == 1) && ((abs $ findVerticalChange str) == 2)) || (((abs $ findHorizontalChange str) == 2) && ((abs $ findVerticalChange str) == 1)))
+
 main :: IO ()
 main = do
   let board = genBoard
@@ -132,13 +147,9 @@ main = do
   printBoard board
   inp <- getLine
   print(typeOf inp)
-  print(isHeadRank inp)
-  print(isHeadFile inp)
-  print(isParsable inp)
-  print(isMoving inp)
-  print(findHorizontalChange inp)
-  print(findVerticalChange inp)
-  print(isCorrectTeam updatedBoard 2 'e' 4)
-  print(getPieceTypeAtSquare updatedBoard 'd' 4)
-  print(getPieceTypeAtSquare updatedBoard 'e' 4)
-  
+  print("onCross: ")
+  print(onCross inp)
+  print("onDiagonal: ")
+  print(onDiagonal inp)
+  print("onL: ")
+  print(onL inp)
