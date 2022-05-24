@@ -117,8 +117,14 @@ updateBoardWithCoords :: Board -> Char -> Int -> Char -> Int -> Board
 updateBoardWithCoords board ff fr lf lr = removePieceFromSquare (assignPieceToSquare board lf lr $ getSquarePiece board (ff,fr)) ff fr
 
 -- input information
-isParsable :: String -> Bool
-isParsable inp = and [(elem (inp!!0) ['a'..'h']), (elem (inp!!1) ['1'..'8']), (elem (inp!!2) ['a'..'h']), (elem (inp!!3) ['1'..'8'])]
+isParsable :: String -> Bool -> Bool
+isParsable inp compCorrect = (lengthCorrect inp) && (componentsCorrect inp)
+
+componentsCorrect :: String -> Bool
+componentsCorrect inp = and [(elem (inp!!0) ['a'..'h']), (elem (inp!!1) ['1'..'8']), (elem (inp!!2) ['a'..'h']), (elem (inp!!3) ['1'..'8'])]
+
+lengthCorrect :: String -> Bool
+lengthCorrect str = (length str == 4)
 
 isMoving :: String -> Bool
 isMoving inp = (inp!!0 /= inp!!2 || inp!!1 /= inp!!3)
@@ -171,10 +177,10 @@ collectSquaresOnHorizontal :: Board -> Move -> [Square]
 collectSquaresOnHorizontal board (ff,fr,lf,lr) = [square | square <- board, onCross (ff,fr,(file square),(rank square)), onCross (lf,lr,(file square),(rank square)), ((inRange (ord ff) (ord (file square)) (ord lf)) || (inRange fr (rank square) lr))]
 
 diagPathFree :: Board -> Move -> Bool
-diagPathFree board move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnDiagonal board move)]
+diagPathFree (board:boards) move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnDiagonal boards move)]
 
 crossPathFree :: Board -> Move -> Bool
-crossPathFree board move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnHorizontal board move)]
+crossPathFree (board:boards) move = and [(teamOf $ piece square) == Blank | square <- (collectSquaresOnHorizontal boards move)]
 
 getTeamAtSquare :: Board -> (Char, Int) -> Team
 getTeamAtSquare board (f, r) = teamOf $ getSquarePiece board (f, r)
@@ -188,14 +194,29 @@ diagPathCapturable board (ff,fr,lf,lr) = ((diagPathFree board (ff,fr,lf,lr)) && 
 lPathCapturable :: Board -> Move -> Bool
 lPathCapturable board (ff,fr,lf,lr) = (getTeamAtSquare board (ff,fr)) /= (getTeamAtSquare board (lf,lr))
 
-adjustPawnOnTeam :: Team -> Int
-adjustPawnOnTeam team = if team == White then 2 else 7
-
-adjustOnTeam :: Board -> (File, Rank) -> Int
-adjustOnTeam board (f, r) = if (getTeamAtSquare board (f,r)) == White then 1 else -1
-
 isOppositeTeam :: Board -> Move -> Bool
 isOppositeTeam board (ff,fr,lf,lr) = (getTeamAtSquare board (lf,lr) /= getTeamAtSquare board (ff,fr)) && (getTeamAtSquare board (lf,lr) /= Blank)
+
+emptySquare :: Board -> (File, Rank) -> Bool
+emptySquare board (f,r) = getTeamAtSquare board (f,r) == Blank
+
+getDefaultPawnRank :: Team -> Int
+getDefaultPawnRank team = if (team == White) then 2 else 7
+
+horizChange :: Move -> Int
+horizChange (ff,fr,lf,lr) = ((ord lf) - (ord ff))
+
+horizChangeEq :: Int -> Move -> Bool
+horizChangeEq n move = (horizChange move) == n
+
+vertChange :: Move -> Int
+vertChange (ff,fr,lf,lr) = (lr - fr)
+
+vertChangeEq :: Int -> Move -> Bool
+vertChangeEq n move = (vertChange move) == n
+
+pawnAdjustedEq :: Int -> Board -> Move -> Bool
+pawnAdjustedEq n board (ff,fr,lf,lr) = (vertChange (ff,fr,lf,lr) == (n * (if (getTeamAtSquare board (ff,fr)) == White then 1 else -1)))
 
 capturable :: Board -> PieceType -> Move -> Bool
 capturable board Rook move = crossPathCapturable board move && onCross move
@@ -204,11 +225,11 @@ capturable board Knight move = lPathCapturable board move && onL move
 capturable board Queen move = ((onDiagonal move && diagPathCapturable board move) || (onCross move && crossPathCapturable board move))
 capturable board Pawn (ff,fr,lf,lr) 
   | getTeamAtSquare board (ff,fr) == Blank = False
-  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 1) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnTeam board (ff, fr))) && (isOppositeTeam board (ff,fr,lf,lr)) = True
-  -- reqs: 1) moving one to side 2) moving one up if White 3) moving one down if Black 4) the other square is occupied by the *opposite* team
-  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (adjustOnBool (getTeamAtSquare board (ff,fr) == White))) && (getTeamAtSquare board (lf,lr) == Blank) = True
-  | ((abs $ findHorizontalChange (ff,fr,lf,lr)) == 0) && (findVerticalChange (ff,fr,lf,lr) == (2 * (adjustOnBool (getTeamAtSquare board (ff,fr) == White)))) && (getTeamAtSquare board (lf, (fr + (adjustOnBool (getTeamAtSquare board (ff,fr) == White)))) == Blank) && (getTeamAtSquare board (lf,lr) == Blank) && (adjustPawnOnTeam $ getTeamAtSquare board (ff,fr)) == fr = True
+  | (horizChangeEq 1 (ff,fr,lf,lr)) && (pawnAdjustedEq 1 board (ff,fr,lf,lr)) && (isOppositeTeam board (ff,fr,lf,lr)) = True
+  | (horizChangeEq 0 (ff,fr,lf,lr)) && (pawnAdjustedEq 1 board (ff,fr,lf,lr)) && (emptySquare board (lf,lr)) = True
+  | (horizChangeEq 0 (ff,fr,lf,lr)) && (pawnAdjustedEq 2 board (ff,fr,lf,lr)) && (crossPathFree board (ff,fr,lf,lr)) && (fr == getDefaultPawnRank (getTeamAtSquare board (ff, fr))) = True
   | otherwise = False
+
 capturable board King (ff,fr,lf,lr)
   | ((abs $ findHorizontalChange (ff,fr,lf,lr)) <= 1) && ((abs $ findVerticalChange (ff,fr,lf,lr)) <= 1) && ((getTeamAtSquare board (lf,lr)) /= (getTeamAtSquare board (ff,fr))) = True
   | otherwise = False
@@ -243,7 +264,7 @@ getValidMove :: Board -> Turn -> IO Move
 getValidMove board turn = do
   print ("Enter move: ")
   candidate <- getLine
-  if not $ isParsable candidate 
+  if not $ isParsable candidate (componentsCorrect candidate)
     then (getValidMove board turn)
   else do {
     let parsedCandidate = parseToMove candidate
